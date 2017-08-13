@@ -24,11 +24,17 @@ class Monster(object):
 
     def attack(self):
         selected_attack = choice(self._attacks)
+
         to_hit = randint(1, 20) + selected_attack['attack_bonus']
-        dmg_roll = sum(map(randint, selected_attack["dmg_dice"]))
-        return selected_attack, to_hit, dmg_roll + selected_attack["damage_bonus"]
+        dmg_roll = self._roll(selected_attack["dmg_dice"])
+        if selected_attack.get("damage_bonus"):
+            dmg_roll += selected_attack["damage_bonus"]
+        return selected_attack, to_hit, dmg_roll
 
     def takes_hit(self, to_hit, dmg):
+        """ Calculate whether our AC is beaten, and if so, subtract the
+        damage dice from our health
+        """
         if to_hit <= self.armor_class:
             return False
         self.hit_points -= dmg
@@ -51,29 +57,45 @@ class Monster(object):
                 num_d, n_sides = dice_sets.split("d")
                 attack_stats["dmg_dice"] = int(num_d) * [int(n_sides)]
             self._attacks.append(attack_stats)
+        if len(self._attacks) == 0:
+            raise CantFight("No normal attacks")
+
+    @staticmethod
+    def _roll(dice):
+        """ Rolls all dice and adds the result. Doesn't add bonuses here.
+        Could have done this with map/sum but made it a psuedo-private
+        static method for readability
+        """
+        total = 0
+        for die in dice:
+            total += randint(1, die)
+        return total
 
 
 def monster_action(attacker, defender):
     attack, to_hit, dmg = attacker.attack()
-    print("%s attacks %s with %s - rolling %d to hit" % \
-          (attacer.name, defender.name, attack["name"]))
+    print("%s attacks %s with %s - rolling %d to hit" %
+          (attacker.name, defender.name, attack["name"], to_hit))
     if defender.takes_hit(to_hit, dmg):
-        print("Attack deals %s %d damage!" % (defender.name, dmg))
+        print("\tAttack deals %s %d damage!" % (defender.name, dmg))
         if defender.hit_points <= 0:
-            print("%s is killed!" % (defender.name))
-            return True, defender
+            print("\t%s is killed!" % defender.name)
+            return True
     else:
-        print("but it misses!")
-    return False, defender
+        print("\tbut it misses!")
+    return False
 
 
 def fight(monster_a, monster_b):
     print("This fight sees %s fight %s" % (monster_a.name, monster_b.name))
+    select_monster = 0
     while True:
-        killed, monster_b = monster_action(monster_a, monster_b)
-        if killed:
-            return
-        killed, monster_a = monster_action(monster_b, monster_a)
+        if select_monster % 2 == 0:
+            atk_mon = monster_a; def_mon = monster_b
+        else:
+            atk_mon = monster_b; def_mon = monster_a
+        killed = monster_action(atk_mon, def_mon)
+        select_monster += 1
         if killed:
             return
 
